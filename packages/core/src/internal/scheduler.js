@@ -28,6 +28,7 @@ function exec(task) {
 export function asap(task) {
   queue.push(task)
 
+  // only semaphore is 0, flush all remaining tasks including this one
   if (!semaphore) {
     suspend()
     flush()

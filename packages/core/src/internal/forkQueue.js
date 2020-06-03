@@ -15,6 +15,12 @@ import { noop, remove } from './utils'
  - It aborts if any uncaught error bubbles up from forks
  - If it completes, the return value is the one returned by the main task
  **/
+/**
+ * 
+ * @param {*} mainTask, mainTask for this forkQueue
+ * @param {*} onAbort, if this forkQueue been abort due to some error
+ * @param {*} cont , cont: (any|error, hasError: boolean)=> any, only when all child fork tasks are done
+ */
 export default function forkQueue(mainTask, onAbort, cont) {
   let tasks = []
   let result
@@ -35,15 +41,17 @@ export default function forkQueue(mainTask, onAbort, cont) {
       if (completed) {
         return
       }
-
+      // remove this task
       remove(tasks, task)
       task.cont = noop
       if (isErr) {
+        // abort all parents
         abort(res)
       } else {
         if (task === mainTask) {
           result = res
         }
+        // if all tasks done
         if (!tasks.length) {
           completed = true
           cont(result)
@@ -57,6 +65,7 @@ export default function forkQueue(mainTask, onAbort, cont) {
       return
     }
     completed = true
+    // call each tasks' cancel method
     tasks.forEach(t => {
       t.cont = noop
       t.cancel()
@@ -65,9 +74,13 @@ export default function forkQueue(mainTask, onAbort, cont) {
   }
 
   return {
+    // add a task to this forked task queue
     addTask,
+    // cancel all tasks
     cancelAll,
+    // abort this forkQueue 
     abort,
+    // get all tasks for this forkQueue, include the main one
     getTasks,
   }
 }

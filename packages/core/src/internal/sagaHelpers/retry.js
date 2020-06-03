@@ -1,6 +1,7 @@
 import fsmIterator, { qEnd } from './fsmIterator'
 import { call, delay } from '../io'
 
+// call(fn) at most maxTries after a span of delayLength
 export default function retry(maxTries, delayLength, fn, ...args) {
   let counter = maxTries
 

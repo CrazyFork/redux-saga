@@ -26,11 +26,14 @@ function ringBuffer(limit = 10, overflowAction) {
       let it = arr[popIndex]
       arr[popIndex] = null
       length--
+      // 为啥是 + 1?
+      // pop index starts at 0
       popIndex = (popIndex + 1) % limit
       return it
     }
   }
 
+  // take all elements out
   const flush = () => {
     let items = []
     while (length) {
@@ -52,6 +55,7 @@ function ringBuffer(limit = 10, overflowAction) {
           case ON_OVERFLOW_SLIDE:
             arr[pushIndex] = it
             pushIndex = (pushIndex + 1) % limit
+            // reset pop index, 这步是必须的要不会出现bug
             popIndex = pushIndex
             break
           case ON_OVERFLOW_EXPAND:
@@ -79,7 +83,11 @@ function ringBuffer(limit = 10, overflowAction) {
 }
 
 export const none = () => zeroBuffer
+// throw error on limit reached 
 export const fixed = limit => ringBuffer(limit, ON_OVERFLOW_THROW)
+// drop on max value reached
 export const dropping = limit => ringBuffer(limit, ON_OVERFLOW_DROP)
+// override existing value
 export const sliding = limit => ringBuffer(limit, ON_OVERFLOW_SLIDE)
+// expanding on 2*n factor
 export const expanding = initialSize => ringBuffer(initialSize, ON_OVERFLOW_EXPAND)

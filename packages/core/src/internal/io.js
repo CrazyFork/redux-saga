@@ -92,6 +92,7 @@ export function race(effects) {
 }
 
 // this match getFnCallDescriptor logic
+// 看 getFnCallDescriptor 逻辑就行 
 const validateFnDescriptor = (effectName, fnDescriptor) => {
   check(fnDescriptor, is.notUndef, `${effectName}: argument fn is undefined or null`)
 
@@ -121,6 +122,17 @@ const validateFnDescriptor = (effectName, fnDescriptor) => {
   check(fn, is.func, `${effectName}: unpacked fn argument (from [context, fn] or {context, fn}) is not a function`)
 }
 
+/**
+ * 
+ * @param {*} fnDescriptor, can be one of these
+ *  - a plain javascript function
+ *  - array with shape [context, function]
+ *  - object with shape {context, function}
+ * 
+ *  - if context exists & function is a string, then function should be `context[function]`
+ *  
+ * @param {*} args 
+ */
 function getFnCallDescriptor(fnDescriptor, args) {
   let context = null
   let fn
@@ -166,7 +178,7 @@ export function apply(context, fn, args = []) {
 
   return makeEffect(effectTypes.CALL, getFnCallDescriptor([context, fn], args))
 }
-
+// :todo
 export function cps(fnDescriptor, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     validateFnDescriptor('cps', fnDescriptor)

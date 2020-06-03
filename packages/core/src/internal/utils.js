@@ -68,6 +68,9 @@ const kThrow = err => {
   throw err
 }
 const kReturn = value => ({ value, done: true })
+
+// :todo, ?
+// 这种手写的iterator感觉完全达不到 yield 的那种程度, 感觉只能遍历呀, 
 export function makeIterator(next, thro = kThrow, name = 'iterator') {
   const iterator = { meta: { name }, next, throw: thro, return: kReturn, isSagaIterator: true }
 
@@ -113,8 +116,10 @@ const freezeActions = store => next => action => next(Object.freeze(action))
 `
 
 // creates empty, but not-holey array
+// creates an empty a array initilized with null
 export const createEmptyArray = n => Array.apply(null, new Array(n))
 
+// todo: why attach a SAGA_ACTION symbol
 export const wrapSagaDispatch = dispatch => action => {
   if (process.env.NODE_ENV !== 'production') {
     check(action, ac => !Object.isFrozen(ac), FROZEN_ACTION_ERROR)
@@ -126,6 +131,7 @@ export const shouldTerminate = res => res === TERMINATE
 export const shouldCancel = res => res === TASK_CANCEL
 export const shouldComplete = res => shouldTerminate(res) || shouldCancel(res)
 
+// :todo:?
 export function createAllStyleChildCallbacks(shape, parentCallback) {
   const keys = Object.keys(shape)
   const totalCount = keys.length
@@ -181,6 +187,7 @@ export function getMetaInfo(fn) {
   }
 }
 
+// :todo, ?
 export function getLocation(instrumented) {
   return instrumented[SAGA_LOCATION]
 }

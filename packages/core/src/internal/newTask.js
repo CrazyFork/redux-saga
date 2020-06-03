@@ -7,11 +7,15 @@ import forkQueue from './forkQueue'
 import * as sagaError from './sagaError'
 
 export default function newTask(env, mainTask, parentContext, parentEffectId, meta, isRoot, cont = noop) {
+  /*
+  RUNNING, CANCELLED, ABORTED, DONE
+  */
   let status = RUNNING
   let taskResult
   let taskError
   let deferredEnd = null
 
+  // array record all aborted tasks for this mainTasks
   const cancelledDueToErrorTasks = []
 
   const context = Object.create(parentContext)
@@ -42,6 +46,7 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
       end(TASK_CANCEL, false)
     }
   }
+
 
   function end(result, isErr) {
     if (!isErr) {
@@ -83,11 +88,18 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
     assignWithSymbols(context, props)
   }
 
+  // toPromise 原来是这么实现的
   function toPromise() {
     if (deferredEnd) {
       return deferredEnd.promise
     }
-
+    /*
+    deferred()=> {
+      promise,
+      resolve,
+      reject
+    }
+    */
     deferredEnd = deferred()
 
     if (status === ABORTED) {

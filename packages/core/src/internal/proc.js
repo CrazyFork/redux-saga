@@ -8,6 +8,16 @@ import { asyncIteratorSymbol, noop, shouldCancel, shouldTerminate } from './util
 import newTask from './newTask'
 import * as sagaError from './sagaError'
 
+/**
+ * all params are describe in runSaga.js file
+ * @param {*} env ,           env
+ * @param {*} iterator        main saga iterator
+ * @param {*} parentContext   parentContext
+ * @param {*} parentEffectId  parentEffectId
+ * @param {*} meta            {name: string, location}
+ * @param {*} isRoot          is a root saga
+ * @param {*} cont            (result|error, hasError: boolean)
+ */
 export default function proc(env, iterator, parentContext, parentEffectId, meta, isRoot, cont) {
   if (process.env.NODE_ENV !== 'production' && iterator[asyncIteratorSymbol]) {
     throw new Error("redux-saga doesn't support async generators, please use only regular ones")

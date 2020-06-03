@@ -1,6 +1,7 @@
 import * as is from '@redux-saga/is'
 import { CANCEL } from '@redux-saga/symbols'
 
+// cb (data|error, hasError: boolean)
 export default function resolvePromise(promise, cb) {
   const cancelPromise = promise[CANCEL]
 
