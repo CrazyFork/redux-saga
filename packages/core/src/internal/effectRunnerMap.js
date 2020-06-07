@@ -1,3 +1,8 @@
+/**
+ * 这个文件对 saga 每个 io effect 定义了如何具体运行. 首先也是最重要的是你需要理解
+ * cb 这个在每个 effect 中的语义, 即 cb(result) 中的 result 最终对应你(user code)
+ * 中 yield 中的返回
+ */
 import { SELF_CANCELLATION, TERMINATE } from '@redux-saga/symbols'
 import * as is from '@redux-saga/is'
 import * as effectTypes from './effectTypes'
@@ -20,6 +25,7 @@ import {
   getMetaInfo,
 } from './utils'
 
+// return name of iterator or fn.
 function getIteratorMetaInfo(iterator, fn) {
   if (iterator.isSagaIterator) {
     return { name: iterator.meta.name }
@@ -43,8 +49,12 @@ function createTaskIterator({ context, fn, args }) {
       if (!resolved) {
         resolved = true
         // Only promises returned from fork will be interpreted. See #1573
+        // bm: 感觉这里 done 的处理没必要呀, 这个 fn 要不返回 promise, 要不常规 value
+        // 在 fork context 下, 这个函数都已经执行完, 没必要等返回的 value resolve 呀
+        // 因为不可能有外面的函数等待 promise resolve 毕竟这个是fork下面的 root saga.
         return { value: result, done: !is.promise(result) }
       } else {
+        // once fn resolved, it return what it been passed
         return { value: arg, done: true }
       }
     }
@@ -65,9 +75,11 @@ function runPutEffect(env, { channel, action, resolve }, cb) {
    The put will be executed atomically. ie nested puts will execute after
    this put has terminated.
    **/
+  //
   asap(() => {
     let result
     try {
+      // put into channel or redux dispatch
       result = (channel ? channel.put : env.dispatch)(action)
     } catch (error) {
       cb(error, true)
@@ -83,24 +95,37 @@ function runPutEffect(env, { channel, action, resolve }, cb) {
   // Put effects are non cancellables
 }
 
+/**
+ * 
+ * @param {*} env 
+ * @param {*} param1 
+ *  - channel
+ *  - pattern
+ *  - maybe: boolean, define how cb should behave when END is received
+ * @param {*} cb: (result | error, isError), 
+ */
 function runTakeEffect(env, { channel = env.channel, pattern, maybe }, cb) {
   const takeCb = input => {
     if (input instanceof Error) {
+      // task's next
       cb(input, true)
       return
     }
+    // when channel is closed or empty, an END result is emit.
     if (isEnd(input) && !maybe) {
       cb(TERMINATE)
       return
     }
     cb(input)
   }
+
   try {
     channel.take(takeCb, is.notUndef(pattern) ? matcher(pattern) : null)
   } catch (err) {
     cb(err, true)
     return
   }
+  // takeCb.cancel is injected when been called with channel.take
   cb.cancel = takeCb.cancel
 }
 
@@ -142,6 +167,7 @@ function runCPSEffect(env, { context, fn, args }, cb) {
 
     fn.apply(context, args.concat(cpsCb))
 
+    // 这个位置.cancel 只能由 fn 函数来注入了.
     if (cpsCb.cancel) {
       cb.cancel = cpsCb.cancel
     }
@@ -150,11 +176,20 @@ function runCPSEffect(env, { context, fn, args }, cb) {
   }
 }
 
+/**
+ * 
+ * @param {*} env 
+ * @param {*} param1 
+ * @param {*} cb: (task)=> void, take a child task
+ * @param {*} param3 
+ *  - task, newTask.js 创建出来的对象
+ */
 function runForkEffect(env, { context, fn, args, detached }, cb, { task: parent }) {
   const taskIterator = createTaskIterator({ context, fn, args })
   const meta = getIteratorMetaInfo(taskIterator, fn)
 
   immediately(() => {
+    // return child task
     const child = proc(env, taskIterator, parent.context, currentEffectId, meta, detached, undefined)
 
     if (detached) {
@@ -164,8 +199,10 @@ function runForkEffect(env, { context, fn, args, detached }, cb, { task: parent 
         parent.queue.addTask(child)
         cb(child)
       } else if (child.isAborted()) {
+        // bubble up
         parent.queue.abort(child.error())
       } else {
+        // cancel or complete
         cb(child)
       }
     }
@@ -178,6 +215,10 @@ function runJoinEffect(env, taskOrTasks, cb, { task }) {
     if (taskToJoin.isRunning()) {
       const joiner = { task, cb }
       cb.cancel = () => {
+        // 默认 task 被创建出来就是 running state
+        // 注意这个地方, 子任务虽然移除了parent joiner, 但是没有减掉对应的 completion count
+        // 冷不丁看起来像是个bug, 但是细想想好想 子任务 如果 cancel 的话, parent task 一定被 cancel
+        // 掉, 那么就没那么重要了
         if (taskToJoin.isRunning()) remove(taskToJoin.joiners, joiner)
       }
       taskToJoin.joiners.push(joiner)
@@ -212,6 +253,7 @@ function cancelSingleTask(taskToCancel) {
 }
 
 function runCancelEffect(env, taskOrTasks, cb, { task }) {
+  // 默认 cancel 就是 cancel 自己, 即 task, 在io.js中有描述
   if (taskOrTasks === SELF_CANCELLATION) {
     cancelSingleTask(task)
   } else if (is.array(taskOrTasks)) {
@@ -219,7 +261,9 @@ function runCancelEffect(env, taskOrTasks, cb, { task }) {
   } else {
     cancelSingleTask(taskOrTasks)
   }
+  // so it basically dont care if sub cancel task actully succeed. (it tasks are async ones)
   cb()
+
   // cancel effects are non cancellables
 }
 
@@ -237,6 +281,7 @@ function runAllEffect(env, effects, cb, { digestEffect }) {
   })
 }
 
+// race all effects
 function runRaceEffect(env, effects, cb, { digestEffect }) {
   const effectId = currentEffectId
   const keys = Object.keys(effects)
@@ -249,11 +294,13 @@ function runRaceEffect(env, effects, cb, { digestEffect }) {
       if (completed) {
         return
       }
+      // task cancel or terminated or error
       if (isErr || shouldComplete(res)) {
         // Race Auto cancellation
         cb.cancel()
         cb(res, isErr)
       } else {
+        // see `cb.cancel` down below, cancel all no-terminated tasks
         cb.cancel()
         completed = true
         response[key] = res
@@ -271,6 +318,7 @@ function runRaceEffect(env, effects, cb, { digestEffect }) {
       keys.forEach(key => childCbs[key].cancel())
     }
   }
+
   keys.forEach(key => {
     if (completed) {
       return
@@ -292,8 +340,13 @@ function runChannelEffect(env, { pattern, buffer }, cb) {
   const chan = channel(buffer)
   const match = matcher(pattern)
 
+  // 从 env.channel 拿到 action, 重新注册自己, 再放到 chan 中
   const taker = action => {
     if (!isEnd(action)) {
+      // register, once this taker is invoked, 
+      // this taker will be removed first,
+      // then invoked, which would register itself again into env.channel
+      // !note, that env.channel vs chan
       env.channel.take(taker, match)
     }
     chan.put(action)
@@ -302,18 +355,23 @@ function runChannelEffect(env, { pattern, buffer }, cb) {
   const { close } = chan
 
   chan.close = () => {
+    // remove taker from channel's subscriber queue
     taker.cancel()
     close()
   }
 
   env.channel.take(taker, match)
+
+  // return this chan to `yield` result
   cb(chan)
 }
 
+// return whether this task is cancelled
 function runCancelledEffect(env, data, cb, { task }) {
   cb(task.isCancelled())
 }
 
+// clear flush items in channel
 function runFlushEffect(env, channel, cb) {
   channel.flush(cb)
 }

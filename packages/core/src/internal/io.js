@@ -18,6 +18,7 @@ const makeEffect = (type, payload) => ({
 
 const isForkEffect = eff => is.effect(eff) && eff.type === effectTypes.FORK
 
+// turn a effect into a detach one
 export const detach = eff => {
   if (process.env.NODE_ENV !== 'production') {
     check(eff, isForkEffect, 'detach(eff): argument must be a fork effect')
@@ -35,26 +36,35 @@ export function take(patternOrChannel = '*', multicastPattern) {
     }
     return makeEffect(effectTypes.TAKE, { pattern: patternOrChannel })
   }
+  // if this channel is multicast one
+  // patternOrChannel is multicast channel and pattern is valid
   if (is.multicast(patternOrChannel) && is.notUndef(multicastPattern) && is.pattern(multicastPattern)) {
     return makeEffect(effectTypes.TAKE, { channel: patternOrChannel, pattern: multicastPattern })
   }
+
   if (is.channel(patternOrChannel)) {
     if (is.notUndef(multicastPattern)) {
       console.warn(`take(channel) takes one argument but two were provided. Second argument is ignored.`)
     }
     return makeEffect(effectTypes.TAKE, { channel: patternOrChannel })
   }
+
   if (process.env.NODE_ENV !== 'production') {
     throw new Error(`take(patternOrChannel): argument ${patternOrChannel} is not valid channel or a valid pattern`)
   }
 }
 
+// allow take a empty result out of channel
 export const takeMaybe = (...args) => {
   const eff = take(...args)
   eff.payload.maybe = true
   return eff
 }
 
+/*
+put(channel, action)
+put(action)
+*/
 export function put(channel, action) {
   if (process.env.NODE_ENV !== 'production') {
     if (arguments.length > 1) {
@@ -65,6 +75,7 @@ export function put(channel, action) {
       check(channel, is.notUndef, 'put(action): argument action is undefined')
     }
   }
+
   if (is.undef(action)) {
     action = channel
     // `undefined` instead of `null` to make default parameter work
@@ -92,7 +103,7 @@ export function race(effects) {
 }
 
 // this match getFnCallDescriptor logic
-// 看 getFnCallDescriptor 逻辑就行 
+// 看 getFnCallDescriptor 逻辑就行,  不用看这个函数, 太tm长了 还没啥用
 const validateFnDescriptor = (effectName, fnDescriptor) => {
   check(fnDescriptor, is.notUndef, `${effectName}: argument fn is undefined or null`)
 
@@ -125,7 +136,7 @@ const validateFnDescriptor = (effectName, fnDescriptor) => {
 /**
  * 
  * @param {*} fnDescriptor, can be one of these
- *  - a plain javascript function
+ *  - fn, a plain javascript function
  *  - array with shape [context, function]
  *  - object with shape {context, function}
  * 
@@ -178,7 +189,8 @@ export function apply(context, fn, args = []) {
 
   return makeEffect(effectTypes.CALL, getFnCallDescriptor([context, fn], args))
 }
-// :todo
+
+// nodejs 类似的 fn 调用
 export function cps(fnDescriptor, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     validateFnDescriptor('cps', fnDescriptor)
@@ -186,6 +198,7 @@ export function cps(fnDescriptor, ...args) {
   return makeEffect(effectTypes.CPS, getFnCallDescriptor(fnDescriptor, args))
 }
 
+// fork a function call
 export function fork(fnDescriptor, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     validateFnDescriptor('fork', fnDescriptor)
@@ -195,6 +208,7 @@ export function fork(fnDescriptor, ...args) {
   return makeEffect(effectTypes.FORK, getFnCallDescriptor(fnDescriptor, args))
 }
 
+// spawn = detach + fork
 export function spawn(fnDescriptor, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     validateFnDescriptor('spawn', fnDescriptor)
@@ -219,6 +233,11 @@ export function join(taskOrTasks) {
   return makeEffect(effectTypes.JOIN, taskOrTasks)
 }
 
+/**
+ * cancel([task...])
+ * cancel(task)
+ * cancel()
+ */
 export function cancel(taskOrTasks = SELF_CANCELLATION) {
   if (process.env.NODE_ENV !== 'production') {
     if (arguments.length > 1) {
@@ -262,6 +281,7 @@ export function actionChannel(pattern, buffer) {
   return makeEffect(effectTypes.ACTION_CHANNEL, { pattern, buffer })
 }
 
+// return whether this task is cancelled
 export function cancelled() {
   return makeEffect(effectTypes.CANCELLED, {})
 }

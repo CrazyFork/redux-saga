@@ -5,7 +5,9 @@ import * as buffers from './buffers'
 import { asap } from './scheduler'
 import * as matchers from './matcher'
 
+// when channel is empty or closed
 export const END = { type: CHANNEL_END_TYPE }
+
 export const isEnd = a => a && a.type === CHANNEL_END_TYPE
 
 const CLOSED_CHANNEL_WITH_TAKERS = 'Cannot have a closed channel with pending takers'
@@ -20,6 +22,8 @@ Hints:
 // * consumer will invoke once, then remove from subscriber's queue
 // * if event hasnt yet come, then this subscriber would be push to listener queue
 // 底层的 buffer 用来缓冲消息.
+
+// user code 中的 channel 一般用的这个
 export function channel(buffer = buffers.expanding()) {
   let closed = false
   let takers = []
@@ -263,11 +267,13 @@ export function multicastChannel() {
   }
 }
 
+// saga 自己调度用的这个channel
 export function stdChannel() {
   const chan = multicastChannel()
   const { put } = chan
   chan.put = input => {
     // prioritize saga action ?
+    // saga 内部处罚的 action, 即在saga中用 put 触发的 action
     if (input[SAGA_ACTION]) {
       put(input)
       return

@@ -6,6 +6,8 @@ function formatLocation(fileName, lineNumber) {
   return `${fileName}?${lineNumber}`
 }
 
+// :bm, where location is set?
+// through saga-babel-plugin
 function effectLocationAsString(effect) {
   const location = getLocation(effect)
   if (location) {

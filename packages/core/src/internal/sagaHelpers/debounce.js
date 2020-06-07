@@ -1,7 +1,8 @@
 import fsmIterator, { safeName } from './fsmIterator'
 import { delay, fork, race, take } from '../io'
 
-// :todo, why debounce doesnt has a error state
+// debounce 的语义就是拿到第一个 action, 然后等待 delayLength 之后执行对应的 action
+// 和 takeLatest 的语义刚好相反, debounce 触发的是最旧的 action
 export default function debounceHelper(delayLength, patternOrChannel, worker, ...args) {
   let action, raceOutput
 
@@ -38,10 +39,12 @@ export default function debounceHelper(delayLength, patternOrChannel, worker, ..
         return { nextState: 'q3', effect: yRace, stateUpdater: setRaceOutput }
       },
       q3() {
-        // if debounce is faster then we move next value out of channel (which is state q1)
-        // 
+        // if debounce is faster, 这步表明 delayLength 时间已经过去了
         return raceOutput.debounce
+          // 执行上次缓存的 action
           ? { nextState: 'q1', effect: yFork(action) }
+          // 这个地方的 setAction 不重要, 重要的是 q1 的 setAction. 这行的语义就是继续去 race.
+          // 然后会新生成 delayLength. 直到在 delayLength time span 之内 channel 中没有同样的 action
           : { nextState: 'q2', effect: yNoop(raceOutput.action), stateUpdater: setAction }
       },
     },

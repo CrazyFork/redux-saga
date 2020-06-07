@@ -24,6 +24,8 @@ export default function sagaMiddlewareFactory({ context = {}, channel = stdChann
       if (sagaMonitor && sagaMonitor.actionDispatched) {
         sagaMonitor.actionDispatched(action)
       }
+      // 这部看来 saga 和 reducer 不冲突呀, not mutually exclusive
+      // 这步很关键呀, dispatch 的 event redirect into saga's channel
       const result = next(action) // hit reducers
       channel.put(action)
       return result

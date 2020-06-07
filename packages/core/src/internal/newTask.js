@@ -6,6 +6,16 @@ import { assignWithSymbols, check, createSetContextWarning, noop } from './utils
 import forkQueue from './forkQueue'
 import * as sagaError from './sagaError'
 
+/**
+ * 
+ * @param {*} env,              , same env inside ./proc.js
+ * @param {*} mainTask          , 
+ * @param {*} parentContext     , same env inside ./proc.js
+ * @param {*} parentEffectId    , same env inside ./proc.js
+ * @param {*} meta              , same env inside ./proc.js
+ * @param {*} isRoot            , same env inside ./proc.js
+ * @param {*} cont 
+ */
 export default function newTask(env, mainTask, parentContext, parentEffectId, meta, isRoot, cont = noop) {
   /*
   RUNNING, CANCELLED, ABORTED, DONE
@@ -24,6 +34,7 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
     function onAbort() {
       cancelledDueToErrorTasks.push(...queue.getTasks().map(t => t.meta.name))
     },
+    // when all tasks inside this forkQueue completes, return mainTask result back
     end,
   )
 
@@ -60,9 +71,12 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
       taskResult = result
       deferredEnd && deferredEnd.resolve(result)
     } else {
+      // when error occurs only this task is marked ABORTED
       status = ABORTED
       sagaError.addSagaFrame({ meta, cancelledTasks: cancelledDueToErrorTasks })
 
+      // why only root saga need this error report?
+      // because any error would propogate up. so it only need to do it here once
       if (task.isRoot) {
         const sagaStack = sagaError.toString()
         // we've dumped the saga stack to string and are passing it to user's code
@@ -73,10 +87,14 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
       taskError = result
       deferredEnd && deferredEnd.reject(result)
     }
+
     task.cont(result, isErr)
+
+    // notify all its parents
     task.joiners.forEach(joiner => {
       joiner.cb(result, isErr)
     })
+
     task.joiners = null
   }
 
@@ -112,22 +130,48 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
   }
 
   const task = {
-    // fields
+    // -- starts: fields
+    // 
     [TASK]: true,
+    // 
     id: parentEffectId,
+    // 
     meta,
+    //
     isRoot,
+
+    // this task's context, derived from parent's context
     context,
+    // sub tasks
+    // shape of { task, cb }, task, cb all parent task's fields, 
+    // (strictly speaking in joined case cb is one of many subroutines of its parent's callback)
+    // record joined parent, it make sense since it needs to notify 
+    // all its parents about its final state
     joiners: [],
+
+    // forkQueue associate with this task
     queue,
 
+    // -- ends: fields
+
     // methods
+
+    // cancel this task, especially the forkQueue, result would be a cancel result
     cancel,
+
+    // 
     cont,
+
+    // end this task with specified result
     end,
+
+    // override context fields
     setContext,
+    // return a promise for this task
     toPromise,
+
     isRunning: () => status === RUNNING,
+
     /*
       This method is used both for answering the cancellation status of the task and answering for CANCELLED effects.
       In most cases, the cancellation of a task propagates to all its unfinished children (including
@@ -146,8 +190,10 @@ export default function newTask(env, mainTask, parentContext, parentEffectId, me
 
       See discussions in #1704
      */
+    // :?, figure this out
     isCancelled: () => status === CANCELLED || (status === RUNNING && mainTask.status === CANCELLED),
     isAborted: () => status === ABORTED,
+
     result: () => taskResult,
     error: () => taskError,
   }

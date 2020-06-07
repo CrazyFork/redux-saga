@@ -10,11 +10,18 @@ import {
   debounceHelper,
 } from './sagaHelpers'
 
+// make sure both patternOrChannel, worker params present itself
 const validateTakeEffect = (fn, patternOrChannel, worker) => {
   check(patternOrChannel, is.notUndef, `${fn.name} requires a pattern or channel`)
   check(worker, is.notUndef, `${fn.name} requires a saga parameter`)
 }
 
+/**
+ * 
+ * @param {*} patternOrChannel 
+ * @param {*} worker , your saga for that pattern. worker would be called like worker(...args, action)
+ * @param  {...any} args , 
+ */
 export function takeEvery(patternOrChannel, worker, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     validateTakeEffect(takeEvery, patternOrChannel, worker)
@@ -39,6 +46,7 @@ export function takeLeading(patternOrChannel, worker, ...args) {
   return fork(takeLeadingHelper, patternOrChannel, worker, ...args)
 }
 
+// 
 export function throttle(ms, pattern, worker, ...args) {
   if (process.env.NODE_ENV !== 'production') {
     check(pattern, is.notUndef, 'throttle requires a pattern')

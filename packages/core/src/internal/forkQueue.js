@@ -44,10 +44,12 @@ export default function forkQueue(mainTask, onAbort, cont) {
       // remove this task
       remove(tasks, task)
       task.cont = noop
+
       if (isErr) {
         // abort all parents
         abort(res)
       } else {
+        // only set result of main task
         if (task === mainTask) {
           result = res
         }

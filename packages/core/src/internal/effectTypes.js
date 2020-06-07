@@ -3,7 +3,8 @@ export const PUT = 'PUT'
 export const ALL = 'ALL'
 export const RACE = 'RACE'
 export const CALL = 'CALL'
-// :?
+
+// node js 中的 callback 形式
 export const CPS = 'CPS'
 
 export const FORK = 'FORK'

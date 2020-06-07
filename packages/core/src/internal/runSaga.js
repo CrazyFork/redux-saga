@@ -9,6 +9,13 @@ import { check, logError, noop, wrapSagaDispatch, identity, getMetaInfo } from '
 const RUN_SAGA_SIGNATURE = 'runSaga(options, saga, ...args)'
 const NON_GENERATOR_ERR = `${RUN_SAGA_SIGNATURE}: saga argument must be a Generator function!`
 
+/**
+ * 
+ * @param {*} param0 
+ *  - effectMiddlewares, 
+ * @param {*} saga 
+ * @param  {...any} args 
+ */
 export function runSaga(
   { channel = stdChannel(), dispatch, getState, context = {}, sagaMonitor, effectMiddlewares, onError = logError },
   saga,
@@ -57,7 +64,10 @@ export function runSaga(
   }
 
   let finalizeRunEffect
+  // 默认这个东西用不上的. 
   if (effectMiddlewares) {
+    // 就是将 effect 进行转换的 middleware
+    // effectMiddleware: effect => effect
     const middleware = compose(...effectMiddlewares)
     finalizeRunEffect = runEffect => {
       return (effect, effectId, currCb) => {
@@ -66,6 +76,7 @@ export function runSaga(
       }
     }
   } else {
+    // 这个是默认的, 也就是啥 runEffect 函数进来就用啥 runEffect 函数执行.
     finalizeRunEffect = identity
   }
 

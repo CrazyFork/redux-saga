@@ -69,11 +69,12 @@ const kThrow = err => {
 }
 const kReturn = value => ({ value, done: true })
 
-// :todo, ?
 // 这种手写的iterator感觉完全达不到 yield 的那种程度, 感觉只能遍历呀, 
+// 基本满足了 iterator 的定义. 所以也没大毛病
 export function makeIterator(next, thro = kThrow, name = 'iterator') {
   const iterator = { meta: { name }, next, throw: thro, return: kReturn, isSagaIterator: true }
 
+  // 这种写法有点牛逼, 
   if (typeof Symbol !== 'undefined') {
     iterator[Symbol.iterator] = () => iterator
   }
@@ -119,7 +120,6 @@ const freezeActions = store => next => action => next(Object.freeze(action))
 // creates an empty a array initilized with null
 export const createEmptyArray = n => Array.apply(null, new Array(n))
 
-// todo: why attach a SAGA_ACTION symbol
 export const wrapSagaDispatch = dispatch => action => {
   if (process.env.NODE_ENV !== 'production') {
     check(action, ac => !Object.isFrozen(ac), FROZEN_ACTION_ERROR)
@@ -131,7 +131,13 @@ export const shouldTerminate = res => res === TERMINATE
 export const shouldCancel = res => res === TASK_CANCEL
 export const shouldComplete = res => shouldTerminate(res) || shouldCancel(res)
 
-// :todo:?
+/**
+ * 
+ * @param {*} shape, taskOrTasks
+ * @param {*} parentCallback: (result|error, error), be called when below one of condition meets
+ *  - if any child task has error
+ *  - complete when all task is complete
+ */
 export function createAllStyleChildCallbacks(shape, parentCallback) {
   const keys = Object.keys(shape)
   const totalCount = keys.length
@@ -157,6 +163,7 @@ export function createAllStyleChildCallbacks(shape, parentCallback) {
       if (completed) {
         return
       }
+      // if any child task has error, or terminated or cancelled
       if (isErr || shouldComplete(res)) {
         parentCallback.cancel()
         parentCallback(res, isErr)
@@ -173,6 +180,7 @@ export function createAllStyleChildCallbacks(shape, parentCallback) {
   parentCallback.cancel = () => {
     if (!completed) {
       completed = true
+      // so basically it can't be canceled
       keys.forEach(key => childCallbacks[key].cancel())
     }
   }
@@ -187,7 +195,7 @@ export function getMetaInfo(fn) {
   }
 }
 
-// :todo, ?
+// returns const { code, fileName, lineNumber } = location
 export function getLocation(instrumented) {
   return instrumented[SAGA_LOCATION]
 }

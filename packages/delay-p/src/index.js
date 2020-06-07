@@ -1,5 +1,10 @@
 import { CANCEL } from '@redux-saga/symbols'
 
+/**
+ * 
+ * @param {*} ms 
+ * @param {*} val , default value to yield
+ */
 export default function delayP(ms, val = true) {
   let timeoutId
   const promise = new Promise(resolve => {

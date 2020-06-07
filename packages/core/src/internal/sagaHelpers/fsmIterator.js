@@ -23,7 +23,7 @@ export function safeName(patternOrChannel) {
 // fsm, Finite State Machine
 // return a iterator of a fms
 export default function fsmIterator(fsm, startState, name) {
-  let stateUpdater, // F(state), function return next state
+  let stateUpdater, // if current state return this, next(arg) would call stateUpdate(arg) first
     errorState, // pointer of fsm object which handles error on next state
     effect, // current effect to return ?
     nextState = startState // next state
@@ -32,6 +32,7 @@ export default function fsmIterator(fsm, startState, name) {
     if (nextState === qEnd) {
       return done(arg)
     }
+    // if errorState is not defined, throw error
     if (error && !errorState) {
       nextState = qEnd
       throw error
@@ -39,6 +40,7 @@ export default function fsmIterator(fsm, startState, name) {
       stateUpdater && stateUpdater(arg)
       const currentState = error ? fsm[errorState](error) : fsm[nextState]()
       ;({ nextState, effect, stateUpdater, errorState } = currentState)
+      // return current state effect
       return nextState === qEnd ? done(arg) : effect
     }
   }
